@@ -1,0 +1,20 @@
+// Esquema de base de datos del POS.
+//
+// Fase 0 (base técnica): aún no hay modelos de negocio. Los modelos se agregan
+// en sus fases correspondientes (ver ROADMAP.md), siempre mediante migración.
+//
+// Convenciones obligatorias (SPEC.md §14, §22, §23 y docs/DATABASE.md):
+// - IDs internos: UUID      -> `id String @id @default(uuid()) @db.Uuid`
+// - Dinero: Decimal         -> `@db.Decimal(12, 2)` (nunca Float)
+// - Fechas: UTC             -> `DateTime @db.Timestamptz(3)`
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}

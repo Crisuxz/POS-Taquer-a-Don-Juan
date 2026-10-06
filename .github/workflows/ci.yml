@@ -1,0 +1,105 @@
+name: CI
+
+# SPEC.md §35: install → lint → typecheck → tests → build (+ E2E y Docker).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, typecheck, pruebas y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pos
+          POSTGRES_PASSWORD: pos_ci_password
+          POSTGRES_DB: pos_taqueria
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pos -d pos_taqueria"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+      DATABASE_URL: postgresql://pos:pos_ci_password@localhost:5432/pos_taqueria
+      DATABASE_URL_TEST: postgresql://pos:pos_ci_password@localhost:5432/pos_taqueria_test
+      CORS_ORIGINS: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: |
+          npm run lint
+          npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Integration tests (PostgreSQL real)
+        run: |
+          PGPASSWORD=pos_ci_password psql -h localhost -U pos -d pos_taqueria \
+            -c 'CREATE DATABASE pos_taqueria_test'
+          npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: Migrations (base de E2E)
+        run: npm run db:migrate
+
+      - name: Install Playwright Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        run: npm run test:e2e
+
+      - name: Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
+  docker:
+    name: Imágenes Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validar docker-compose.yml
+        run: docker compose --profile full config --quiet
+
+      - name: Build API y Web
+        run: docker compose --profile full build

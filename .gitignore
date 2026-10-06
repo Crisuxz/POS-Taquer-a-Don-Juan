@@ -1,0 +1,40 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Prisma Client generado
+apps/api/src/generated/
+
+# Pruebas
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Variables de entorno (solo se versionan los .example)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Herramientas locales de agentes
+.claude/settings.local.json
+.claude/.headroom_*
+.serena/cache/
+.serena/project.local.yml
