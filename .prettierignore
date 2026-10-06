@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+apps/api/src/generated/
+apps/api/prisma/migrations/**/*.sql
+next-env.d.ts
+.claude/
+.serena/
+
+# Documentos maestros: se conservan tal como fueron entregados.
+SPEC.md
+ROADMAP.md
+PHASE_PROMPT.md
+
+# Generado y mantenido por `next dev` (reglas para agentes de IA).
+apps/web/AGENTS.md

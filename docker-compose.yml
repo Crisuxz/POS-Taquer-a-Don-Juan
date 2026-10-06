@@ -1,0 +1,81 @@
+# Dependencias locales del POS.
+#
+#   docker compose up -d --wait postgres          -> solo PostgreSQL (desarrollo diario)
+#   docker compose --profile full up -d --build   -> PostgreSQL + migraciones + API + Web
+#
+# Los valores por defecto son solo para desarrollo local; se sobrescriben con un
+# archivo .env en la raíz (ver .env.example).
+
+name: pos-taqueria
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-pos_taqueria}
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB:-pos_taqueria_test}
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: build
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pos}:${POSTGRES_PASSWORD:-pos_dev_password}@postgres:5432/${POSTGRES_DB:-pos_taqueria}
+    command: ['npm', 'run', 'prisma:migrate:deploy', '-w', '@pos/api']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-pos}:${POSTGRES_PASSWORD:-pos_dev_password}@postgres:5432/${POSTGRES_DB:-pos_taqueria}
+      CORS_ORIGINS: ${WEB_ORIGIN:-http://localhost:3000}
+      LOG_LEVEL: log
+    ports:
+      - '${API_PORT:-3001}:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    profiles: ['full']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:3001/api}
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
